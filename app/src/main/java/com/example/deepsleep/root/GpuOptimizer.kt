@@ -20,7 +20,6 @@ object GpuOptimizer {
         allSuccess = allSuccess && RootCommander.safeWrite("$KGSL_BASE/max_gpuclk", params.maxFreq.toString())
         allSuccess = allSuccess && RootCommander.safeWrite("$KGSL_BASE/thermal_pwrlevel", params.thermalPwrLevel.toString())
 
-        // 动态查找 devfreq 目录设置 min/max freq
         val devfreqBase = "/sys/class/devfreq"
         val kgslDirs = RootCommander.exec("ls $devfreqBase | grep kgsl").out
         kgslDirs.forEach { dir ->
@@ -28,7 +27,6 @@ object GpuOptimizer {
             allSuccess = allSuccess && RootCommander.safeWrite("$devfreqBase/$dir/max_freq", params.maxFreq.toString())
         }
 
-        // 温度设置
         val gpuZone = findGpuThermalZone()
         if (gpuZone != null) {
             allSuccess = allSuccess && RootCommander.safeWrite("/sys/class/thermal/thermal_zone$gpuZone/trip_point_0_temp", params.tripPointTemp.toString())
@@ -52,6 +50,4 @@ object GpuOptimizer {
         }
         return null
     }
-
-    // 保留原有模式方法...
 }
