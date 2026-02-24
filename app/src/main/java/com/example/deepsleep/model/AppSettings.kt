@@ -5,24 +5,16 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 data class AppSettings(
-    // 深度睡眠
     val deepSleep: DeepSleep = DeepSleep(),
-    // 性能优化
     val performanceOptimization: PerformanceOptimization = PerformanceOptimization(),
-    // 进程管理
     val processManagement: ProcessManagement = ProcessManagement(),
-    // 后台优化
     val backgroundOptimization: BackgroundOptimization = BackgroundOptimization(),
-    // 场景检测
     val sceneCheck: SceneCheck = SceneCheck(),
-    // 白名单
     val whitelist: List<WhitelistItem> = emptyList(),
-    // 系统状态
     val rootGranted: Boolean = false,
     val serviceRunning: Boolean = false
 ) : Parcelable
 
-// ========== 深度睡眠 ==========
 @Parcelize
 data class DeepSleep(
     val enabled: Boolean = false,
@@ -32,7 +24,6 @@ data class DeepSleep(
     val disablePowerSaverOnWake: Boolean = false
 ) : Parcelable
 
-// ========== 性能优化 ==========
 @Parcelize
 data class PerformanceOptimization(
     val enabled: Boolean = false,
@@ -124,7 +115,6 @@ data class GpuParams(
     }
 }
 
-// ========== 进程管理 ==========
 @Parcelize
 data class ProcessManagement(
     val enabled: Boolean = false,
@@ -147,7 +137,6 @@ data class ProcessFreeze(
     val delaySeconds: Int = 30
 ) : Parcelable
 
-// ========== 后台优化 ==========
 @Parcelize
 data class BackgroundOptimization(
     val enabled: Boolean = false,
@@ -156,7 +145,6 @@ data class BackgroundOptimization(
     val setStandbyBucketRare: Boolean = false
 ) : Parcelable
 
-// ========== 场景检测 ==========
 @Parcelize
 data class SceneCheck(
     val enabled: Boolean = false,
@@ -171,7 +159,6 @@ data class SceneCheck(
     val checkCharging: Boolean = false
 ) : Parcelable
 
-// ========== 白名单 ==========
 @Parcelize
 data class WhitelistItem(
     val id: String,
