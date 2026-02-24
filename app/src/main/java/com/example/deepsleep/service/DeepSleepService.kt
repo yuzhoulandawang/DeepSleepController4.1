@@ -131,7 +131,7 @@ class DeepSleepService : Service() {
         unregisterReceiver(screenStateReceiver)
         serviceScope.cancel()
         ProcessManager.onDestroy()
-        DeepSleepController.exitDeepSleep()
+        runBlocking { DeepSleepController.exitDeepSleep() } // 修复挂起函数调用
         super.onDestroy()
     }
 
