@@ -1,6 +1,7 @@
 package com.example.deepsleep.root
 
 import android.util.Log
+import com.example.deepsleep.model.DozeState
 import kotlinx.coroutines.*
 
 object DeepSleepController {
