@@ -3,101 +3,163 @@ package com.example.deepsleep.model
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
-/**
- * 应用设置数据类
- * 注意：所有字段必须与 SettingsRepository 中的键一一对应
- */
 @Parcelize
 data class AppSettings(
-    // ========== 根权限状态 ==========
+    // 深度睡眠
+    val deepSleep: DeepSleep = DeepSleep(),
+    // 性能优化
+    val performanceOptimization: PerformanceOptimization = PerformanceOptimization(),
+    // 进程管理
+    val processManagement: ProcessManagement = ProcessManagement(),
+    // 后台优化
+    val backgroundOptimization: BackgroundOptimization = BackgroundOptimization(),
+    // 场景检测
+    val sceneCheck: SceneCheck = SceneCheck(),
+    // 白名单
+    val whitelist: List<WhitelistItem> = emptyList(),
+    // 系统状态
     val rootGranted: Boolean = false,
-    val serviceRunning: Boolean = false,
+    val serviceRunning: Boolean = false
+) : Parcelable
 
-    // ========== 深度睡眠控制 ==========
-    val deepSleepEnabled: Boolean = false,
-    val wakeupSuppressEnabled: Boolean = false,
-    val alarmSuppressEnabled: Boolean = false,
-
-    // ========== 深度 Doze 配置 ==========
-    val deepDozeEnabled: Boolean = false,
-    val deepDozeDelaySeconds: Int = 30,
-    val deepDozeForceMode: Boolean = false,
-
-    // ========== 深度睡眠 Hook 配置 ==========
-    val deepSleepHookEnabled: Boolean = false,
-    val deepSleepDelaySeconds: Int = 60,
-    val deepSleepBlockExit: Boolean = false,
-    val deepSleepCheckInterval: Int = 30,
-
-    // ========== 后台优化 ==========
-    val backgroundOptimizationEnabled: Boolean = false,
-    val appSuspendEnabled: Boolean = false,
-    val backgroundRestrictEnabled: Boolean = false,
-
-    // ========== GPU 优化 ==========
-    val gpuOptimizationEnabled: Boolean = false,
-    val gpuMode: String = "default",
-    val gpuThrottlingEnabled: Boolean = false,
-    val gpuBusSplitEnabled: Boolean = false,
-    val gpuIdleTimer: Int = 50,
-    val gpuMaxFreq: Long = 770000000L,
-    val gpuMinFreq: Long = 310000000L,
-    val gpuThermalPwrLevel: Int = 5,
-    val gpuTripPointTemp: Int = 55000,
-    val gpuTripPointHyst: Int = 5000,
-
-    // ========== 电池优化 ==========
-    val batteryOptimizationEnabled: Boolean = false,
-    val powerSavingEnabled: Boolean = false,
-
-    // ========== 系统省电模式联动 ==========
+// ========== 深度睡眠 ==========
+@Parcelize
+data class DeepSleep(
+    val enabled: Boolean = false,
+    val delaySeconds: Int = 60,
+    val checkIntervalSeconds: Int = 30,
     val enablePowerSaverOnSleep: Boolean = false,
-    val disablePowerSaverOnWake: Boolean = false,
+    val disablePowerSaverOnWake: Boolean = false
+) : Parcelable
 
-    // ========== CPU 绑定 ==========
-    val cpuBindEnabled: Boolean = false,
-    val cpuMode: String = "daily",
+// ========== 性能优化 ==========
+@Parcelize
+data class PerformanceOptimization(
+    val enabled: Boolean = false,
+    val selectedMode: PerformanceMode = PerformanceMode.DAILY,
+    val ecoProfile: PerformanceProfile = PerformanceProfile.defaultEco(),
+    val dailyProfile: PerformanceProfile = PerformanceProfile.defaultDaily(),
+    val performanceProfile: PerformanceProfile = PerformanceProfile.defaultPerformance()
+) : Parcelable
 
-    // ========== CPU 调度优化 ==========
-    val cpuOptimizationEnabled: Boolean = false,
-    val autoSwitchCpuMode: Boolean = false,
-    val allowManualCpuMode: Boolean = true,
-    val cpuModeOnScreen: String = "daily",
-    val cpuModeOnScreenOff: String = "standby",
+enum class PerformanceMode { ECO, DAILY, PERFORMANCE }
 
-    // ========== CPU 参数 - 日常模式 ==========
-    val dailyUpRateLimit: Int = 1000,
-    val dailyDownRateLimit: Int = 500,
-    val dailyHiSpeedLoad: Int = 85,
-    val dailyTargetLoads: Int = 80,
+@Parcelize
+data class PerformanceProfile(
+    val cpu: CpuParams,
+    val gpu: GpuParams
+) : Parcelable {
+    companion object {
+        fun defaultEco() = PerformanceProfile(
+            cpu = CpuParams.defaultEco(),
+            gpu = GpuParams.defaultEco()
+        )
+        fun defaultDaily() = PerformanceProfile(
+            cpu = CpuParams.defaultDaily(),
+            gpu = GpuParams.defaultDaily()
+        )
+        fun defaultPerformance() = PerformanceProfile(
+            cpu = CpuParams.defaultPerformance(),
+            gpu = GpuParams.defaultPerformance()
+        )
+    }
+}
 
-    // ========== CPU 参数 - 待机模式 ==========
-    val standbyUpRateLimit: Int = 5000,
-    val standbyDownRateLimit: Int = 0,
-    val standbyHiSpeedLoad: Int = 95,
-    val standbyTargetLoads: Int = 90,
+@Parcelize
+data class CpuParams(
+    val upRate: Int,
+    val downRate: Int,
+    val hispeedLoad: Int,
+    val targetLoads: Int
+) : Parcelable {
+    companion object {
+        fun defaultEco() = CpuParams(5000, 0, 95, 90)
+        fun defaultDaily() = CpuParams(1000, 500, 85, 80)
+        fun defaultPerformance() = CpuParams(0, 0, 75, 70)
+    }
+}
 
-    // ========== CPU 参数 - 默认模式 ==========
-    val defaultUpRateLimit: Int = 0,
-    val defaultDownRateLimit: Int = 0,
-    val defaultHiSpeedLoad: Int = 90,
-    val defaultTargetLoads: Int = 90,
+@Parcelize
+data class GpuParams(
+    val maxFreq: Long,
+    val minFreq: Long,
+    val idleTimer: Int,
+    val throttlingEnabled: Boolean,
+    val busSplitEnabled: Boolean,
+    val thermalPwrLevel: Int,
+    val tripPointTemp: Int,
+    val tripPointHyst: Int
+) : Parcelable {
+    companion object {
+        fun defaultEco() = GpuParams(
+            maxFreq = 500_000_000,
+            minFreq = 231_000_000,
+            idleTimer = 100,
+            throttlingEnabled = true,
+            busSplitEnabled = true,
+            thermalPwrLevel = 8,
+            tripPointTemp = 45000,
+            tripPointHyst = 3000
+        )
+        fun defaultDaily() = GpuParams(
+            maxFreq = 770_000_000,
+            minFreq = 310_000_000,
+            idleTimer = 50,
+            throttlingEnabled = true,
+            busSplitEnabled = true,
+            thermalPwrLevel = 5,
+            tripPointTemp = 55000,
+            tripPointHyst = 5000
+        )
+        fun defaultPerformance() = GpuParams(
+            maxFreq = 903_000_000,
+            minFreq = 578_000_000,
+            idleTimer = 10,
+            throttlingEnabled = false,
+            busSplitEnabled = false,
+            thermalPwrLevel = 0,
+            tripPointTemp = 65000,
+            tripPointHyst = 7000
+        )
+    }
+}
 
-    // ========== CPU 参数 - 性能模式 ==========
-    val perfUpRateLimit: Int = 0,
-    val perfDownRateLimit: Int = 0,
-    val perfHiSpeedLoad: Int = 75,
-    val perfTargetLoads: Int = 70,
+// ========== 进程管理 ==========
+@Parcelize
+data class ProcessManagement(
+    val enabled: Boolean = false,
+    val suppress: ProcessSuppress = ProcessSuppress(),
+    val freeze: ProcessFreeze = ProcessFreeze()
+) : Parcelable
 
-    // ========== Freezer 服务 ==========
-    val freezerEnabled: Boolean = false,
-    val freezeDelay: Int = 30,
+@Parcelize
+data class ProcessSuppress(
+    val enabled: Boolean = false,
+    val mode: SuppressMode = SuppressMode.CONSERVATIVE,
+    val oomScore: Int = 800
+) : Parcelable
 
-    // ========== 白名单 ==========
-    val whitelist: List<String> = emptyList(),
+enum class SuppressMode { AGGRESSIVE, CONSERVATIVE }
 
-    // ========== 场景检测 ==========
-    val sceneCheckEnabled: Boolean = false,
+@Parcelize
+data class ProcessFreeze(
+    val enabled: Boolean = false,
+    val delaySeconds: Int = 30
+) : Parcelable
+
+// ========== 后台优化 ==========
+@Parcelize
+data class BackgroundOptimization(
+    val enabled: Boolean = false,
+    val restrictBackground: Boolean = false,
+    val ignoreWakeLock: Boolean = false,
+    val setStandbyBucketRare: Boolean = false
+) : Parcelable
+
+// ========== 场景检测 ==========
+@Parcelize
+data class SceneCheck(
+    val enabled: Boolean = false,
     val checkNetworkTraffic: Boolean = true,
     val checkAudioPlayback: Boolean = true,
     val checkNavigation: Boolean = true,
@@ -106,9 +168,16 @@ data class AppSettings(
     val checkWifiHotspot: Boolean = true,
     val checkUsbTethering: Boolean = true,
     val checkScreenCasting: Boolean = true,
-    val checkCharging: Boolean = false,
-
-    // ========== 进程压制（OOM 评分） ==========
-    val processSuppressEnabled: Boolean = false,
-    val suppressScore: Int = 500
+    val checkCharging: Boolean = false
 ) : Parcelable
+
+// ========== 白名单 ==========
+@Parcelize
+data class WhitelistItem(
+    val id: String,
+    val name: String,
+    val note: String = "",
+    val type: WhitelistType
+) : Parcelable
+
+enum class WhitelistType { PROCESS, BACKGROUND, NETWORK }
