@@ -13,12 +13,18 @@ import java.util.concurrent.ConcurrentHashMap
 class FreezerService : Service() {
     private val TAG = "FreezerService"
 
+    companion object {
+        private var enabled = false
+        private var delaySeconds = 30
+
+        fun updateConfig(enabled: Boolean, delaySeconds: Int) {
+            this.enabled = enabled
+            this.delaySeconds = delaySeconds
+        }
+    }
+
     private val FROZEN_GROUP = "/dev/freezer/frozen"
     private val THAW_GROUP = "/dev/freezer/thaw"
-    private val FREEZE_DELAY = 30L
-    private val MONITOR_LEVEL = 2
-    private val FG_CACHE_FILE = "/dev/local/tmp/fg_app.cache"
-    private val FG_CACHE_TTL = 2
     private val STATE_DIR = "/dev/local/tmp/freeze_state"
     private val WORKER_DIR = "$STATE_DIR/workers"
 
@@ -30,9 +36,6 @@ class FreezerService : Service() {
         "com.android.systemui"
     )
 
-    private val ENABLE_FREEZER = true
-    private var lastFgApp: String? = null
-    private var lastFgCheckTime = 0L
     private var currentFgApp: String? = null
     private var currentIsSystem = false
     private val tokenMap = ConcurrentHashMap<String, String>()
@@ -53,7 +56,9 @@ class FreezerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startMonitor()
+        if (enabled) {
+            startMonitor()
+        }
         return START_STICKY
     }
 
@@ -61,17 +66,9 @@ class FreezerService : Service() {
         monitorScope.launch {
             currentFgApp = getForegroundApp()
             currentIsSystem = isSystemApp(currentFgApp)
-            writeFgCache(currentFgApp)
             Log.i(TAG, "Monitor started, initial FG: $currentFgApp (system=$currentIsSystem)")
 
-            val tags = when (MONITOR_LEVEL) {
-                1 -> listOf("-b", "events", "-s", "wm_set_resumed_activity:V", "ActivityManager:V")
-                2 -> listOf("-b", "events", "-b", "system", "-b", "main", "-v", "tag", "-s",
-                    "wm_set_resumed_activity:V", "ActivityManager:V", "WindowManager:V")
-                3 -> listOf("-b", "all", "-s", "wm_set_resumed_activity:V")
-                else -> listOf("-b", "events", "-s", "wm_set_resumed_activity:V")
-            }
-
+            val tags = listOf("-b", "events", "-s", "wm_set_resumed_activity:V")
             try {
                 val process = ProcessBuilder("logcat", *tags.toTypedArray()).redirectErrorStream(true).start()
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
@@ -88,41 +85,22 @@ class FreezerService : Service() {
 
     private fun parseLogcatLine(line: String): String? {
         val skipKeywords = listOf("recents_animation_input_consumer", "SnapshotStartingWindow",
-            "InputMethod", "NOT_VISIBLE", "NO_WINDOW", "Update InputWindowHandle", "finishDrawingLocked",
-            "showSurfaceRobustly", "interceptKey", "drawing", "token", "laying", "animat",
-            "orientation", "config", "type=1400", "leaving", "Ignore")
-
+            "InputMethod", "NOT_VISIBLE", "NO_WINDOW")
         if (skipKeywords.any { line.contains(it) }) return null
 
         var pkg: String? = null
-        var isSwitch = false
-
         when {
             line.contains("wm_set_resumed_activity") -> {
                 val afterBracket = line.substringAfter("[", "")
                 val afterComma = afterBracket.substringAfter(",", "")
                 pkg = afterComma.substringBefore("/")
-                if (!pkg.isNullOrBlank()) isSwitch = true
             }
             line.contains("cmp=") -> {
                 val cmp = line.substringAfter("cmp=", "")
                 pkg = cmp.substringBefore("/")
-                isSwitch = true
-            }
-            line.contains("moveTaskToFront") || line.contains("realActivity=") -> {
-                val real = line.substringAfter("realActivity=", "")
-                pkg = real.substringBefore("/")
-                isSwitch = true
             }
         }
-
-        if (isSwitch && !pkg.isNullOrBlank()) {
-            pkg = pkg.replace("}", "").replace(":", "").trim()
-            if (pkg.contains(".") && !pkg.contains("=") && !pkg.contains("[") && !pkg.contains("]")) {
-                return pkg
-            }
-        }
-        return null
+        return pkg?.replace("}", "")?.replace(":", "")?.trim()?.takeIf { it.contains(".") }
     }
 
     private fun handleForegroundChange(newPkg: String) {
@@ -131,7 +109,6 @@ class FreezerService : Service() {
 
         if (isNewSystem && currentIsSystem) {
             currentFgApp = newPkg
-            writeFgCache(newPkg)
             return
         }
 
@@ -142,8 +119,6 @@ class FreezerService : Service() {
             unfreezePackage(newPkg)
             currentFgApp = newPkg
             currentIsSystem = isNewSystem
-            writeFgCache(newPkg)
-            Log.d(TAG, "Switch to previously frozen app: $newPkg")
             return
         }
 
@@ -153,7 +128,7 @@ class FreezerService : Service() {
             writeFile("$STATE_DIR/$newPkg.token", newToken)
             unfreezePackage(newPkg)
 
-            if (ENABLE_FREEZER && !currentFgApp.isNullOrBlank() && !currentIsSystem) {
+            if (enabled && !currentFgApp.isNullOrBlank() && !currentIsSystem) {
                 val fgApp = currentFgApp
                 if (fgApp != null && !hasActiveWorker(fgApp)) {
                     val oldToken = generateToken()
@@ -165,8 +140,6 @@ class FreezerService : Service() {
 
             currentFgApp = newPkg
             currentIsSystem = isNewSystem
-            writeFgCache(newPkg)
-            Log.d(TAG, "Switch to app: $newPkg (system=$isNewSystem)")
         }
     }
 
@@ -185,36 +158,25 @@ class FreezerService : Service() {
     }
 
     private fun getPidsForPackage(pkg: String): List<Int> {
-        return try {
-            val result = Shell.cmd("pgrep -f $pkg").exec()
-            result.out.mapNotNull { it.toIntOrNull() }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        return runCatching {
+            Shell.cmd("pgrep -f $pkg").exec().out.mapNotNull { it.toIntOrNull() }
+        }.getOrDefault(emptyList())
     }
 
     private fun freezePackage(pkg: String) {
-        try {
-            val pids = getPidsForPackage(pkg)
-            pids.forEach { pid ->
-                Shell.cmd("echo $pid >> $FROZEN_GROUP/tasks").exec()
-            }
-            Log.i(TAG, "FROZEN: $pkg (PIDs: $pids)")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to freeze $pkg", e)
+        val pids = getPidsForPackage(pkg)
+        pids.forEach { pid ->
+            Shell.cmd("echo $pid >> $FROZEN_GROUP/tasks").exec()
         }
+        Log.i(TAG, "FROZEN: $pkg")
     }
 
     private fun unfreezePackage(pkg: String) {
-        try {
-            val pids = getPidsForPackage(pkg)
-            pids.forEach { pid ->
-                Shell.cmd("echo $pid >> $THAW_GROUP/tasks").exec()
-            }
-            Log.i(TAG, "THAWED: $pkg")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to thaw $pkg", e)
+        val pids = getPidsForPackage(pkg)
+        pids.forEach { pid ->
+            Shell.cmd("echo $pid >> $THAW_GROUP/tasks").exec()
         }
+        Log.i(TAG, "THAWED: $pkg")
     }
 
     private fun generateToken(): String {
@@ -241,7 +203,7 @@ class FreezerService : Service() {
 
     private fun startWorker(pkg: String, token: String) {
         val job = monitorScope.launch {
-            delay(FREEZE_DELAY * 1000)
+            delay(delaySeconds * 1000L)
             val currentToken = runCatching {
                 Shell.cmd("cat $STATE_DIR/$pkg.token").exec().out.firstOrNull()
             }.getOrNull()
@@ -256,12 +218,6 @@ class FreezerService : Service() {
     }
 
     private fun getForegroundApp(): String? {
-        val cacheFileExists = runCatching { Shell.cmd("[ -f $FG_CACHE_FILE ]").exec().isSuccess }.getOrDefault(false)
-        if (cacheFileExists) {
-            val cached = runCatching { Shell.cmd("cat $FG_CACHE_FILE").exec().out.firstOrNull() }.getOrNull()
-            if (!cached.isNullOrBlank()) return cached
-        }
-
         val windowOutput = runCatching {
             Shell.cmd("dumpsys window").exec().out.joinToString("\n")
         }.getOrNull() ?: return null
@@ -276,26 +232,14 @@ class FreezerService : Service() {
         return null
     }
 
-    private fun writeFgCache(pkg: String?) {
-        if (pkg.isNullOrBlank()) return
-        Shell.cmd("echo $pkg > $FG_CACHE_FILE").exec()
-        lastFgApp = pkg
-        lastFgCheckTime = System.currentTimeMillis() / 1000
-    }
-
-    private fun checkFileExists(path: String): Boolean {
-        return Shell.cmd("[ -f $path ]").exec().isSuccess
-    }
-
-    private fun writeFile(path: String, content: String) {
-        Shell.cmd("echo $content > $path").exec()
-    }
+    private fun checkFileExists(path: String): Boolean = Shell.cmd("[ -f $path ]").exec().isSuccess
+    private fun writeFile(path: String, content: String) = Shell.cmd("echo $content > $path").exec()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        super.onDestroy()
         monitorScope.cancel()
         freezeTasks.values.forEach { it?.cancel() }
+        super.onDestroy()
     }
 }
