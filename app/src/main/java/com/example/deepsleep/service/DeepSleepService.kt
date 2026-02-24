@@ -1,77 +1,153 @@
 package com.example.deepsleep.service
 
 import android.app.*
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.deepsleep.MainActivity
 import com.example.deepsleep.R
-import com.example.deepsleep.data.LogRepository
-import com.example.deepsleep.data.SettingsRepository
-import com.example.deepsleep.data.StatsRepository
-import com.example.deepsleep.model.AppSettings
-import com.example.deepsleep.model.LogLevel
-import com.example.deepsleep.root.OptimizationManager
-import com.example.deepsleep.root.ProcessSuppressor
+import com.example.deepsleep.data.*
+import com.example.deepsleep.model.PerformanceMode
+import com.example.deepsleep.root.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
 
 class DeepSleepService : Service() {
-
-    companion object {
-        private const val TAG = "DeepSleepService"
-        private const val NOTIFICATION_ID = 1001
-        private const val CHANNEL_ID = "deepsleep_service"
-        private const val CHANNEL_NAME = "DeepSleep Controller"
-        const val ACTION_START = "com.example.deepsleep.ACTION_START"
-        const val ACTION_STOP = "com.example.deepsleep.ACTION_STOP"
-    }
-
+    private val TAG = "DeepSleepService"
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var isRunning = false
-    private var optimizationJob: Job? = null
+    private var enterJob: Job? = null
+
+    private val screenStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_ON -> handleScreenOn()
+                Intent.ACTION_SCREEN_OFF -> handleScreenOff()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        registerReceiver(screenStateReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        })
+        startForeground(NOTIFICATION_ID, createNotification("服务运行中"))
         Log.i(TAG, "Service created")
-        serviceScope.launch {
-            LogRepository.appendLog(LogLevel.INFO, TAG, "DeepSleep service created")
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand: action=${intent?.action}")
         when (intent?.action) {
             ACTION_STOP -> {
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
-        if (!isRunning) {
-            startAsForeground()
-            isRunning = true
-            // 更新服务运行状态
-            serviceScope.launch {
-                SettingsRepository.setServiceRunning(true)
-                LogRepository.appendLog(LogLevel.INFO, TAG, "DeepSleep service started")
-            }
-            startOptimizationLoop()
-        }
         return START_STICKY
     }
 
-    private fun startAsForeground() {
-        startForeground(NOTIFICATION_ID, createNotification("DeepSleep 控制器运行中"))
+    private fun handleScreenOn() {
+        serviceScope.launch {
+            enterJob?.cancel()
+            enterJob = null
+
+            DeepSleepController.exitDeepSleep()
+
+            val settings = SettingsRepository.settings.first()
+            if (settings.performanceOptimization.enabled) {
+                val mode = settings.performanceOptimization.selectedMode
+                val profile = when (mode) {
+                    PerformanceMode.ECO -> settings.performanceOptimization.ecoProfile
+                    PerformanceMode.DAILY -> settings.performanceOptimization.dailyProfile
+                    PerformanceMode.PERFORMANCE -> settings.performanceOptimization.performanceProfile
+                }
+                OptimizationManager.applyPerformanceProfile(profile, mode)
+            }
+
+            ProcessManager.onScreenStateChanged(true)
+
+            if (settings.deepSleep.disablePowerSaverOnWake) {
+                PowerSaverController.disablePowerSaver()
+            }
+
+            LogRepository.info(TAG, "Screen ON: applied performance and exited deep sleep")
+        }
+    }
+
+    private fun handleScreenOff() {
+        serviceScope.launch {
+            val settings = SettingsRepository.settings.first()
+            if (!settings.deepSleep.enabled && !settings.performanceOptimization.enabled && !settings.processManagement.suppress.enabled) {
+                return@launch
+            }
+
+            val delay = settings.deepSleep.delaySeconds * 1000L
+            enterJob = launch {
+                delay(delay)
+
+                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                if (pm.isInteractive) return@launch
+
+                if (settings.sceneCheck.enabled) {
+                    val sceneChecker = SceneChecker(this@DeepSleepService)
+                    if (sceneChecker.shouldBlockDeepSleep(settings)) {
+                        LogRepository.info(TAG, "场景检测阻止进入深度睡眠")
+                        return@launch
+                    }
+                }
+
+                if (settings.performanceOptimization.enabled) {
+                    OptimizationManager.applyPerformanceProfile(
+                        settings.performanceOptimization.ecoProfile,
+                        PerformanceMode.ECO
+                    )
+                }
+
+                ProcessManager.onScreenStateChanged(false)
+
+                if (settings.deepSleep.enabled) {
+                    DeepSleepController.enterDeepSleep(
+                        blockExit = true,
+                        checkIntervalSeconds = settings.deepSleep.checkIntervalSeconds
+                    )
+                }
+
+                if (settings.deepSleep.enablePowerSaverOnSleep) {
+                    PowerSaverController.enablePowerSaver()
+                }
+
+                LogRepository.info(TAG, "Screen OFF: entered deep sleep mode")
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(screenStateReceiver)
+        serviceScope.cancel()
+        ProcessManager.onDestroy()
+        DeepSleepController.exitDeepSleep()
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val NOTIFICATION_ID = 1001
+        private const val CHANNEL_ID = "deepsleep_service"
+        const val ACTION_START = "com.example.deepsleep.ACTION_START"
+        const val ACTION_STOP = "com.example.deepsleep.ACTION_STOP"
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
-                description = "DeepSleep 后台优化服务"
+            val channel = NotificationChannel(CHANNEL_ID, "DeepSleep Controller", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "DeepSleep 后台服务"
                 setShowBadge(false)
             }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
@@ -89,77 +165,5 @@ class DeepSleepService : Service() {
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
-    }
-
-    private fun startOptimizationLoop() {
-        optimizationJob = serviceScope.launch {
-            Log.i(TAG, "Starting optimization loop")
-            while (isActive) {
-                try {
-                    val settings = SettingsRepository.settings.first()
-                    if (settings.backgroundOptimizationEnabled) applyBackgroundOptimization(settings)
-                    if (settings.gpuOptimizationEnabled) applyGpuOptimization(settings)
-                    if (settings.processSuppressEnabled) applyProcessSuppression(settings)
-                    if (settings.cpuBindEnabled) applyCpuBinding(settings)
-                    delay(60000)
-                } catch (e: CancellationException) {
-                    Log.i(TAG, "Optimization loop cancelled")
-                    break
-                } catch (e: Exception) {
-                    Log.e(TAG, "Optimization loop error", e)
-                    LogRepository.appendLog(LogLevel.ERROR, TAG, "Optimization loop error: ${e.message}")
-                    delay(10000)
-                }
-            }
-        }
-    }
-
-    private suspend fun applyBackgroundOptimization(settings: AppSettings) {
-        if (settings.backgroundRestrictEnabled) {
-            val count = ProcessSuppressor.suppressBackgroundApps(settings.suppressScore)
-            Log.d(TAG, "Background restrict: suppressed $count apps")
-        }
-    }
-
-    private suspend fun applyGpuOptimization(settings: AppSettings) {
-        val mode = when (settings.gpuMode) {
-            "performance" -> OptimizationManager.PerformanceMode.PERFORMANCE
-            "power_saving" -> OptimizationManager.PerformanceMode.STANDBY
-            else -> OptimizationManager.PerformanceMode.DAILY
-        }
-        if (OptimizationManager.applyAllOptimizations(mode)) {
-            StatsRepository.recordGpuOptimization()
-        }
-    }
-
-    private suspend fun applyProcessSuppression(settings: AppSettings) {
-        val count = ProcessSuppressor.suppressBackgroundApps(settings.suppressScore)
-        if (count > 0) StatsRepository.recordAppSuppressed(count)
-    }
-
-    private suspend fun applyCpuBinding(settings: AppSettings) {
-        val mode = when (settings.cpuMode) {
-            "performance" -> OptimizationManager.PerformanceMode.PERFORMANCE
-            "standby" -> OptimizationManager.PerformanceMode.STANDBY
-            else -> OptimizationManager.PerformanceMode.DAILY
-        }
-        if (OptimizationManager.applyAllOptimizations(mode)) {
-            StatsRepository.recordCpuBinding()
-        }
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onDestroy() {
-        Log.i(TAG, "Service destroying")
-        optimizationJob?.cancel()
-        serviceScope.cancel()
-        isRunning = false
-        runBlocking {
-            // 更新服务停止状态
-            SettingsRepository.setServiceRunning(false)
-            LogRepository.appendLog(LogLevel.INFO, TAG, "DeepSleep service destroyed")
-        }
-        super.onDestroy()
     }
 }
