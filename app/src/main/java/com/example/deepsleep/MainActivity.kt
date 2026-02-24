@@ -50,7 +50,6 @@ class MainActivity : ComponentActivity() {
             viewModel.refreshRootStatus()
         }
 
-        // 注册屏幕状态监听
         viewModel.registerScreenStateReceiver(this)
 
         Intent(this, DeepSleepService::class.java).also { intent ->
