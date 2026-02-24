@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.deepsleep.data.SettingsRepository
 import com.example.deepsleep.model.SuppressMode
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 object ProcessManager {
     private const val TAG = "ProcessManager"
