@@ -7,28 +7,13 @@ class UninstallManager(private val context: Context) {
 
     suspend fun performUninstall(): UninstallResult {
         return try {
-            // 1. 停止服务
             stopService()
-
-            // 2. 恢复 motion
             DozeController.enableMotion()
-
-            // 3. 退出深度睡眠
-            DeepSleepController.exitDeepSleep()
-
-            // 4. 恢复所有应用后台权限
+            DeepSleepController.exitDeepSleep()          // 已添加导入
             BackgroundOptimizer.restoreAll()
-
-            // 5. 恢复 WALT 参数（如果没有 restoreDefault，可跳过或实现恢复方法）
-            // 如果需要，可以调用一个恢复函数，例如：
-            // WaltOptimizer.restoreDefaults()
-
-            // 6. 清理系统属性
+            // WaltOptimizer.restoreDefault()            // 已移除
             cleanupProperties()
-
-            // 7. 删除所有文件
             cleanupFiles()
-
             UninstallResult.Success
         } catch (e: Exception) {
             UninstallResult.Error(e.message ?: "未知错误")
