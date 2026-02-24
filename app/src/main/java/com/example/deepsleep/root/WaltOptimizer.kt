@@ -34,6 +34,4 @@ object WaltOptimizer {
 
         return anyApplied
     }
-
-    // 可保留原有的 applyMode 方法，但内部调用 applyCpuParams
 }
