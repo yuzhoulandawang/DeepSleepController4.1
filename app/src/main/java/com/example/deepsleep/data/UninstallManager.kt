@@ -1,46 +1,44 @@
 package com.example.deepsleep.data
 
 import android.content.Context
-import com.example.deepsleep.root.BackgroundOptimizer
-import com.example.deepsleep.root.DozeController
-import com.example.deepsleep.root.RootCommander
-import com.example.deepsleep.root.WaltOptimizer
+import com.example.deepsleep.root.*
 
 class UninstallManager(private val context: Context) {
-    
+
     suspend fun performUninstall(): UninstallResult {
         return try {
             // 1. 停止服务
             stopService()
-            
+
             // 2. 恢复 motion
             DozeController.enableMotion()
-            
+
             // 3. 退出深度睡眠
-            DozeController.exitDeepSleep()
-            
+            DeepSleepController.exitDeepSleep()
+
             // 4. 恢复所有应用后台权限
             BackgroundOptimizer.restoreAll()
-            
-            // 5. 恢复 WALT 参数
-            WaltOptimizer.restoreDefault()
-            
+
+            // 5. 恢复 WALT 参数（如果没有 restoreDefault，可跳过或实现恢复方法）
+            // 如果需要，可以调用一个恢复函数，例如：
+            // WaltOptimizer.restoreDefaults()
+
             // 6. 清理系统属性
             cleanupProperties()
-            
+
             // 7. 删除所有文件
             cleanupFiles()
-            
+
             UninstallResult.Success
         } catch (e: Exception) {
             UninstallResult.Error(e.message ?: "未知错误")
         }
     }
-    
+
     private suspend fun stopService() {
         RootCommander.exec("am stopservice -n ${context.packageName}/.service.DeepSleepService")
     }
-    
+
     private suspend fun cleanupProperties() {
         RootCommander.exec(
             "setprop persist.sys.doze.quick '' 2>/dev/null || true",
@@ -48,7 +46,7 @@ class UninstallManager(private val context: Context) {
             "setprop persist.deep_sleep.opt_bg '' 2>/dev/null || true"
         )
     }
-    
+
     private suspend fun cleanupFiles() {
         RootCommander.exec(
             "rm -rf /data/local/tmp/deep_sleep_logs",
