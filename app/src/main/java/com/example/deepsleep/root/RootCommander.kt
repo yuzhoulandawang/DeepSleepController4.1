@@ -19,7 +19,7 @@ object RootCommander {
     }
 
     suspend fun requestRootAccess(): Boolean = withContext(Dispatchers.IO) {
-        return@withContext try {
+        try {
             Shell.getShell()
             true
         } catch (e: Exception) {
@@ -28,8 +28,7 @@ object RootCommander {
     }
 
     suspend fun checkRoot(): Boolean = withContext(Dispatchers.IO) {
-        val result = Shell.cmd("id").exec()
-        result.out.any { it.contains("uid=0") }
+        Shell.cmd("id").exec().out.any { it.contains("uid=0") }
     }
 
     suspend fun exec(command: String): Shell.Result = withContext(Dispatchers.IO) {
