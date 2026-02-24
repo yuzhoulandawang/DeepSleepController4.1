@@ -13,95 +13,47 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 object LogRepository {
-
     private const val TAG = "LogRepository"
     private val logDir = "/data/local/tmp/deep_sleep_logs"
     private val logPath = "$logDir/main.log"
     private val mutex = Mutex()
 
-    suspend fun debug(tag: String, message: String) {
-        appendLog(LogLevel.DEBUG, tag, message)
-    }
-
-    suspend fun info(tag: String, message: String) {
-        appendLog(LogLevel.INFO, tag, message)
-    }
-
-    suspend fun success(tag: String, message: String) {
-        appendLog(LogLevel.SUCCESS, tag, message)
-    }
-
-    suspend fun warn(tag: String, message: String) {
-        appendLog(LogLevel.WARNING, tag, message)
-    }
-
-    suspend fun error(tag: String, message: String, throwable: Throwable? = null) {
-        appendLog(LogLevel.ERROR, tag, message, throwable?.stackTraceToString())
-    }
-
-    suspend fun fatal(tag: String, message: String, throwable: Throwable? = null) {
-        appendLog(LogLevel.FATAL, tag, message, throwable?.stackTraceToString())
-    }
+    suspend fun debug(tag: String, message: String) = appendLog(LogLevel.DEBUG, tag, message)
+    suspend fun info(tag: String, message: String) = appendLog(LogLevel.INFO, tag, message)
+    suspend fun success(tag: String, message: String) = appendLog(LogLevel.SUCCESS, tag, message)
+    suspend fun warn(tag: String, message: String) = appendLog(LogLevel.WARNING, tag, message)
+    suspend fun error(tag: String, message: String, throwable: Throwable? = null) = appendLog(LogLevel.ERROR, tag, message, throwable?.stackTraceToString())
+    suspend fun fatal(tag: String, message: String, throwable: Throwable? = null) = appendLog(LogLevel.FATAL, tag, message, throwable?.stackTraceToString())
 
     suspend fun readLogs(): List<LogEntry> = withContext(Dispatchers.IO) {
         try {
             val content = RootCommander.readFile(logPath) ?: return@withContext emptyList()
             content.lineSequence()
                 .filter { it.isNotBlank() }
-                .mapNotNull { line -> parseLogLine(line) }
+                .mapNotNull { parseLogLine(it) }
                 .toList()
         } catch (e: Exception) {
-            Log.e(TAG, "读取日志失败", e)
             emptyList()
         }
     }
 
     private fun parseLogLine(line: String): LogEntry? {
-        return try {
-            val regex = """\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(?:\[([^\]]+)\]\s+)?(.*)""".toRegex()
-            val match = regex.find(line)
-            if (match != null) {
-                val level = try {
-                    LogLevel.valueOf(match.groupValues[2].uppercase())
-                } catch (e: Exception) {
-                    LogLevel.INFO
-                }
-                LogEntry(
-                    timestamp = parseTimestamp(match.groupValues[1]),
-                    level = level,
-                    tag = match.groupValues[3].ifEmpty { "General" },
-                    message = match.groupValues[4]
-                )
-            } else {
-                val oldRegex = """\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s+(.*)""".toRegex()
-                val oldMatch = oldRegex.find(line)
-                if (oldMatch != null) {
-                    LogEntry(
-                        timestamp = parseTimestamp(oldMatch.groupValues[1]),
-                        level = LogLevel.INFO,
-                        tag = "",
-                        message = oldMatch.groupValues[2]
-                    )
-                } else {
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "解析日志行失败: $line", e)
-            null
-        }
+        val regex = """\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(?:\[([^\]]+)\]\s+)?(.*)""".toRegex()
+        val match = regex.find(line) ?: return null
+        val level = try { LogLevel.valueOf(match.groupValues[2].uppercase()) } catch (e: Exception) { LogLevel.INFO }
+        return LogEntry(
+            timestamp = parseTimestamp(match.groupValues[1]),
+            level = level,
+            tag = match.groupValues[3].ifEmpty { "General" },
+            message = match.groupValues[4]
+        )
     }
 
     private fun parseTimestamp(timestamp: String): Long {
-        return try {
-            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timestamp)?.time ?: 0L
-        } catch (e: Exception) {
-            0L
-        }
+        return try { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timestamp)?.time ?: 0L } catch (e: Exception) { 0L }
     }
 
     suspend fun appendLog(level: LogLevel, tag: String, message: String, throwable: String? = null) = mutex.withLock {
@@ -125,7 +77,6 @@ object LogRepository {
             try {
                 RootCommander.exec("echo '' > $logPath").isSuccess
             } catch (e: Exception) {
-                Log.e(TAG, "清除日志失败", e)
                 false
             }
         }
@@ -154,7 +105,6 @@ object LogRepository {
             RootCommander.exec("chmod 644 ${destFile.absolutePath} 2>/dev/null")
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destFile)
         } catch (e: Exception) {
-            Log.e(TAG, "创建分享文件失败", e)
             null
         }
     }
