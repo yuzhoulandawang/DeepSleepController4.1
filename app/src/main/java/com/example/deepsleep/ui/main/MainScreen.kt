@@ -6,6 +6,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,12 +19,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.deepsleep.model.AppSettings
+import com.example.deepsleep.model.*
 import kotlinx.coroutines.launch
 
-/**
- * 主页面（整合所有设置项，无图标，芯片式模式选择，CPU调度优化合并了CPU绑定）
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -51,143 +50,37 @@ fun MainScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 状态卡片
-            StatusCard(settings, viewModel)
+            StatusCard(settings)
 
-            // 深度睡眠控制
-            DeepSleepControlSection(settings, viewModel)
+            DeepSleepCard(settings.deepSleep, viewModel)
 
-            // 深度 Doze 配置
-            SettingsSection(title = "深度 Doze 配置") {
-                SwitchItem(
-                    title = "启用深度 Doze",
-                    subtitle = "息屏后自动进入 Device Idle 模式",
-                    checked = settings.deepDozeEnabled,
-                    onCheckedChange = { viewModel.setDeepDozeEnabled(it) }
-                )
-                if (settings.deepDozeEnabled) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    NumberInputField(
-                        label = "延迟进入时间（秒）",
-                        value = settings.deepDozeDelaySeconds.toString(),
-                        onValueChange = { newValue ->
-                            newValue.toIntOrNull()?.let {
-                                scope.launch { viewModel.setDeepDozeDelaySeconds(it) }
-                            }
-                        },
-                        focusManager = focusManager
-                    )
-                    SwitchItem(
-                        title = "强制 Doze 模式",
-                        subtitle = "禁用 motion 检测，强制进入 Doze",
-                        checked = settings.deepDozeForceMode,
-                        onCheckedChange = { viewModel.setDeepDozeForceMode(it) }
-                    )
-                }
-            }
-
-            // 深度睡眠 Hook 版本
-            SettingsSection(title = "深度睡眠（Hook 版本）") {
-                SwitchItem(
-                    title = "启用深度睡眠 Hook",
-                    subtitle = "息屏后强制进入深度休眠，屏蔽自动退出",
-                    checked = settings.deepSleepHookEnabled,
-                    onCheckedChange = { viewModel.setDeepSleepHookEnabled(it) }
-                )
-                if (settings.deepSleepHookEnabled) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    NumberInputField(
-                        label = "延迟进入时间（秒）",
-                        value = settings.deepSleepDelaySeconds.toString(),
-                        onValueChange = { newValue ->
-                            newValue.toIntOrNull()?.let {
-                                scope.launch { viewModel.setDeepSleepDelaySeconds(it) }
-                            }
-                        },
-                        focusManager = focusManager
-                    )
-                    SwitchItem(
-                        title = "阻止自动退出",
-                        subtitle = "屏蔽移动、广播等自动退出条件",
-                        checked = settings.deepSleepBlockExit,
-                        onCheckedChange = { viewModel.setDeepSleepBlockExit(it) }
-                    )
-                    NumberInputField(
-                        label = "状态检查间隔（秒）",
-                        value = settings.deepSleepCheckInterval.toString(),
-                        onValueChange = { newValue ->
-                            newValue.toIntOrNull()?.let {
-                                scope.launch { viewModel.setDeepSleepCheckInterval(it) }
-                            }
-                        },
-                        focusManager = focusManager
-                    )
-                }
-            }
-
-            // 系统省电模式联动
-            SettingsSection(title = "系统省电模式") {
-                SwitchItem(
-                    title = "睡眠时开启省电模式",
-                    subtitle = "进入深度睡眠时自动开启系统省电",
-                    checked = settings.enablePowerSaverOnSleep,
-                    onCheckedChange = { viewModel.setEnablePowerSaverOnSleep(it) }
-                )
-                SwitchItem(
-                    title = "唤醒时关闭省电模式",
-                    subtitle = "退出深度睡眠时自动关闭系统省电",
-                    checked = settings.disablePowerSaverOnWake,
-                    onCheckedChange = { viewModel.setDisablePowerSaverOnWake(it) }
-                )
-            }
-
-            // 后台优化
-            BackgroundOptimizationSection(settings, viewModel)
-
-            // 白名单管理
-            WhitelistSection(settings, viewModel, onNavigateToWhitelist)
-
-            // CPU 调度优化（合并了CPU绑定）
-            CpuSchedulerSection(settings, viewModel)
-
-            // GPU 优化
-            GpuOptimizationSectionChip(settings, viewModel)
-
-            // 电池优化
-            BatteryOptimizationSection(settings, viewModel)
-
-            // 进程压制
-            ProcessSuppressSection(settings, viewModel, focusManager)
-
-            // Freezer 服务
-            FreezerSection(settings, viewModel, focusManager)
-
-            // 场景检测
-            SettingsSection(title = "场景检测") {
-                SwitchItem(
-                    title = "启用场景检测",
-                    subtitle = "检测特定场景并调整优化策略",
-                    checked = settings.sceneCheckEnabled,
-                    onCheckedChange = { viewModel.setSceneCheckEnabled(it) }
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                ClickableItem(
-                    title = "配置检测项",
-                    subtitle = "选择要检测的场景类型",
-                    onClick = onNavigateToSceneCheck
-                )
-            }
-
-            // 统计数据入口
-            ClickableItem(
-                title = "统计数据",
-                subtitle = "查看优化效果统计",
-                onClick = onNavigateToStats
+            PerformanceCard(
+                perf = settings.performanceOptimization,
+                onUpdate = { viewModel.updatePerformanceOptimization(it) }
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            ProcessManagementCard(
+                pm = settings.processManagement,
+                onUpdate = { viewModel.updateProcessManagement(it) }
+            )
 
-            // 日志入口
+            BackgroundOptimizationCard(
+                bg = settings.backgroundOptimization,
+                onUpdate = { viewModel.updateBackgroundOptimization(it) }
+            )
+
+            ClickableItem(
+                title = "场景检测",
+                subtitle = "配置阻止深度睡眠的场景条件",
+                onClick = onNavigateToSceneCheck
+            )
+
+            ClickableItem(
+                title = "白名单管理",
+                subtitle = "管理不受优化的应用",
+                onClick = onNavigateToWhitelist
+            )
+
             ClickableItem(
                 title = "日志",
                 subtitle = "查看应用运行日志",
@@ -197,9 +90,8 @@ fun MainScreen(
     }
 }
 
-// ========== 组件 ==========
 @Composable
-fun StatusCard(settings: AppSettings, viewModel: MainViewModel) {
+fun StatusCard(settings: AppSettings) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -224,219 +116,68 @@ fun StatusCard(settings: AppSettings, viewModel: MainViewModel) {
 }
 
 @Composable
-fun DeepSleepControlSection(settings: AppSettings, viewModel: MainViewModel) {
-    SettingsSection(title = "深度睡眠控制") {
+fun DeepSleepCard(deepSleep: DeepSleep, viewModel: MainViewModel) {
+    SettingsSection(title = "深度睡眠") {
         SwitchItem(
-            title = "启用深度睡眠控制",
-            subtitle = "控制系统进入深度睡眠模式",
-            checked = settings.deepSleepEnabled,
+            title = "启用深度睡眠",
+            subtitle = "息屏后自动进入深度睡眠并阻止退出",
+            checked = deepSleep.enabled,
             onCheckedChange = { viewModel.setDeepSleepEnabled(it) }
         )
-        if (settings.deepSleepEnabled) {
+        if (deepSleep.enabled) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            SwitchItem(
-                title = "抑制唤醒",
-                subtitle = "阻止应用唤醒设备",
-                checked = settings.wakeupSuppressEnabled,
-                onCheckedChange = { viewModel.setWakeupSuppressEnabled(it) }
+            NumberInputField(
+                label = "延迟进入时间（秒）",
+                value = deepSleep.delaySeconds.toString(),
+                onValueChange = { newValue ->
+                    newValue.toIntOrNull()?.let {
+                        viewModel.setDeepSleepDelaySeconds(it)
+                    }
+                }
+            )
+            NumberInputField(
+                label = "状态检查间隔（秒）",
+                value = deepSleep.checkIntervalSeconds.toString(),
+                onValueChange = { newValue ->
+                    newValue.toIntOrNull()?.let {
+                        viewModel.setDeepSleepCheckInterval(it)
+                    }
+                }
             )
             SwitchItem(
-                title = "抑制闹钟",
-                subtitle = "阻止非重要闹钟唤醒",
-                checked = settings.alarmSuppressEnabled,
-                onCheckedChange = { viewModel.setAlarmSuppressEnabled(it) }
+                title = "进入时开启系统省电",
+                subtitle = "进入深度睡眠时自动开启系统省电模式",
+                checked = deepSleep.enablePowerSaverOnSleep,
+                onCheckedChange = { viewModel.setEnablePowerSaverOnSleep(it) }
+            )
+            SwitchItem(
+                title = "退出时关闭系统省电",
+                subtitle = "退出深度睡眠时自动关闭系统省电模式",
+                checked = deepSleep.disablePowerSaverOnWake,
+                onCheckedChange = { viewModel.setDisablePowerSaverOnWake(it) }
             )
         }
     }
 }
 
 @Composable
-fun BackgroundOptimizationSection(settings: AppSettings, viewModel: MainViewModel) {
-    SettingsSection(title = "后台优化") {
-        SwitchItem(
-            title = "启用后台优化",
-            subtitle = "优化后台应用行为",
-            checked = settings.backgroundOptimizationEnabled,
-            onCheckedChange = { viewModel.setBackgroundOptimizationEnabled(it) }
-        )
-        if (settings.backgroundOptimizationEnabled) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            SwitchItem(
-                title = "应用挂起",
-                subtitle = "挂起不活跃的后台应用",
-                checked = settings.appSuspendEnabled,
-                onCheckedChange = { viewModel.setAppSuspendEnabled(it) }
-            )
-            SwitchItem(
-                title = "后台限制",
-                subtitle = "限制后台应用资源使用",
-                checked = settings.backgroundRestrictEnabled,
-                onCheckedChange = { viewModel.setBackgroundRestrictEnabled(it) }
-            )
-        }
-    }
-}
-
-@Composable
-fun WhitelistSection(
-    settings: AppSettings,
-    viewModel: MainViewModel,
-    onNavigateToWhitelist: () -> Unit
+fun PerformanceCard(
+    perf: PerformanceOptimization,
+    onUpdate: (PerformanceOptimization) -> Unit
 ) {
-    SettingsSection(title = "白名单管理") {
-        ClickableItem(
-            title = "管理白名单",
-            subtitle = "选择不受深度睡眠影响的应用",
-            onClick = onNavigateToWhitelist
+    var showAdvancedDialog by remember { mutableStateOf(false) }
+
+    SettingsSection(title = "性能优化") {
+        SwitchItem(
+            title = "启用性能优化",
+            subtitle = "自动管理 CPU/GPU 参数和核心绑定",
+            checked = perf.enabled,
+            onCheckedChange = { onUpdate(perf.copy(enabled = it)) }
         )
-        if (settings.whitelist.isNotEmpty()) {
+        if (perf.enabled) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Text(
-                text = "已添加 ${settings.whitelist.size} 个应用",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun BatteryOptimizationSection(settings: AppSettings, viewModel: MainViewModel) {
-    SettingsSection(title = "电池优化") {
-        SwitchItem(
-            title = "启用电池优化",
-            subtitle = "优化电池使用效率",
-            checked = settings.batteryOptimizationEnabled,
-            onCheckedChange = { viewModel.setBatteryOptimizationEnabled(it) }
-        )
-        if (settings.batteryOptimizationEnabled) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            SwitchItem(
-                title = "省电模式",
-                subtitle = "降低功耗以延长续航",
-                checked = settings.powerSavingEnabled,
-                onCheckedChange = { viewModel.setPowerSavingEnabled(it) }
-            )
-        }
-    }
-}
-
-@Composable
-fun CpuSchedulerSection(settings: AppSettings, viewModel: MainViewModel) {
-    SettingsSection(title = "CPU 调度优化") {
-        SwitchItem(
-            title = "启用 CPU 调度优化",
-            subtitle = "优化 CPU 调度器并自动应用 CPU 绑定",
-            checked = settings.cpuOptimizationEnabled,
-            onCheckedChange = { viewModel.setCpuOptimizationEnabled(it) }
-        )
-        if (settings.cpuOptimizationEnabled) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            SwitchItem(
-                title = "自动切换 CPU 模式",
-                subtitle = "亮屏/息屏时自动切换模式",
-                checked = settings.autoSwitchCpuMode,
-                onCheckedChange = { viewModel.setAutoSwitchCpuMode(it) }
-            )
-            if (settings.autoSwitchCpuMode) {
-                Text(
-                    text = "亮屏模式",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    CpuModeChip(
-                        mode = "daily",
-                        currentMode = settings.cpuModeOnScreen,
-                        onClick = { viewModel.setCpuModeOnScreen("daily") }
-                    )
-                    CpuModeChip(
-                        mode = "standby",
-                        currentMode = settings.cpuModeOnScreen,
-                        onClick = { viewModel.setCpuModeOnScreen("standby") }
-                    )
-                    CpuModeChip(
-                        mode = "performance",
-                        currentMode = settings.cpuModeOnScreen,
-                        onClick = { viewModel.setCpuModeOnScreen("performance") }
-                    )
-                }
-
-                Text(
-                    text = "息屏模式",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    CpuModeChip(
-                        mode = "daily",
-                        currentMode = settings.cpuModeOnScreenOff,
-                        onClick = { viewModel.setCpuModeOnScreenOff("daily") }
-                    )
-                    CpuModeChip(
-                        mode = "standby",
-                        currentMode = settings.cpuModeOnScreenOff,
-                        onClick = { viewModel.setCpuModeOnScreenOff("standby") }
-                    )
-                    CpuModeChip(
-                        mode = "performance",
-                        currentMode = settings.cpuModeOnScreenOff,
-                        onClick = { viewModel.setCpuModeOnScreenOff("performance") }
-                    )
-                }
-            } else {
-                Text(
-                    text = "当前 CPU 模式",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    CpuModeChip(
-                        mode = "daily",
-                        currentMode = settings.cpuMode,
-                        onClick = { viewModel.setCpuMode("daily") }
-                    )
-                    CpuModeChip(
-                        mode = "standby",
-                        currentMode = settings.cpuMode,
-                        onClick = { viewModel.setCpuMode("standby") }
-                    )
-                    CpuModeChip(
-                        mode = "performance",
-                        currentMode = settings.cpuMode,
-                        onClick = { viewModel.setCpuMode("performance") }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun GpuOptimizationSectionChip(settings: AppSettings, viewModel: MainViewModel) {
-    SettingsSection(title = "GPU 优化") {
-        SwitchItem(
-            title = "启用 GPU 优化",
-            subtitle = "优化 GPU 性能和功耗",
-            checked = settings.gpuOptimizationEnabled,
-            onCheckedChange = { viewModel.setGpuOptimizationEnabled(it) }
-        )
-        if (settings.gpuOptimizationEnabled) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            Text(
-                text = "GPU 模式",
+                text = "当前模式",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -445,20 +186,314 @@ fun GpuOptimizationSectionChip(settings: AppSettings, viewModel: MainViewModel) 
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                GpuModeChip(
-                    mode = "default",
-                    currentMode = settings.gpuMode,
-                    onClick = { viewModel.setGpuMode("default") }
+                PerformanceModeChip(
+                    mode = PerformanceMode.ECO,
+                    currentMode = perf.selectedMode,
+                    onClick = { onUpdate(perf.copy(selectedMode = PerformanceMode.ECO)) }
                 )
-                GpuModeChip(
-                    mode = "performance",
-                    currentMode = settings.gpuMode,
-                    onClick = { viewModel.setGpuMode("performance") }
+                PerformanceModeChip(
+                    mode = PerformanceMode.DAILY,
+                    currentMode = perf.selectedMode,
+                    onClick = { onUpdate(perf.copy(selectedMode = PerformanceMode.DAILY)) }
                 )
-                GpuModeChip(
-                    mode = "power_saving",
-                    currentMode = settings.gpuMode,
-                    onClick = { viewModel.setGpuMode("power_saving") }
+                PerformanceModeChip(
+                    mode = PerformanceMode.PERFORMANCE,
+                    currentMode = perf.selectedMode,
+                    onClick = { onUpdate(perf.copy(selectedMode = PerformanceMode.PERFORMANCE)) }
+                )
+            }
+            Button(
+                onClick = { showAdvancedDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("高级自定义")
+            }
+        }
+    }
+
+    if (showAdvancedDialog) {
+        PerformanceAdvancedDialog(
+            perf = perf,
+            onDismiss = { showAdvancedDialog = false },
+            onConfirm = { updatedPerf ->
+                onUpdate(updatedPerf)
+                showAdvancedDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun PerformanceModeChip(
+    mode: PerformanceMode,
+    currentMode: PerformanceMode,
+    onClick: () -> Unit
+) {
+    val isSelected = mode == currentMode
+    val modeName = when (mode) {
+        PerformanceMode.ECO -> "省电"
+        PerformanceMode.DAILY -> "日常"
+        PerformanceMode.PERFORMANCE -> "性能"
+    }
+    FilterChip(
+        selected = isSelected,
+        onClick = onClick,
+        label = { Text(modeName) },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+@Composable
+fun PerformanceAdvancedDialog(
+    perf: PerformanceOptimization,
+    onDismiss: () -> Unit,
+    onConfirm: (PerformanceOptimization) -> Unit
+) {
+    var ecoProfile by remember { mutableStateOf(perf.ecoProfile) }
+    var dailyProfile by remember { mutableStateOf(perf.dailyProfile) }
+    var performanceProfile by remember { mutableStateOf(perf.performanceProfile) }
+    var selectedTab by remember { mutableStateOf(0) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("性能参数自定义") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+            ) {
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("省电") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("日常") })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("性能") })
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                when (selectedTab) {
+                    0 -> ProfileEditSection(
+                        profile = ecoProfile,
+                        onProfileChange = { ecoProfile = it }
+                    )
+                    1 -> ProfileEditSection(
+                        profile = dailyProfile,
+                        onProfileChange = { dailyProfile = it }
+                    )
+                    2 -> ProfileEditSection(
+                        profile = performanceProfile,
+                        onProfileChange = { performanceProfile = it }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        perf.copy(
+                            ecoProfile = ecoProfile,
+                            dailyProfile = dailyProfile,
+                            performanceProfile = performanceProfile
+                        )
+                    )
+                }
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+fun ProfileEditSection(
+    profile: PerformanceProfile,
+    onProfileChange: (PerformanceProfile) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("CPU 参数", style = MaterialTheme.typography.titleSmall)
+        NumberInputField(
+            label = "升频速率限制（微秒）",
+            value = profile.cpu.upRate.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(cpu = profile.cpu.copy(upRate = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "降频速率限制（微秒）",
+            value = profile.cpu.downRate.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(cpu = profile.cpu.copy(downRate = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "高负载阈值（%）",
+            value = profile.cpu.hispeedLoad.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(cpu = profile.cpu.copy(hispeedLoad = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "目标负载（%）",
+            value = profile.cpu.targetLoads.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(cpu = profile.cpu.copy(targetLoads = it)))
+                }
+            }
+        )
+
+        Text("GPU 参数", style = MaterialTheme.typography.titleSmall)
+        NumberInputField(
+            label = "最大频率（Hz）",
+            value = profile.gpu.maxFreq.toString(),
+            onValueChange = { newValue ->
+                newValue.toLongOrNull()?.let {
+                    onProfileChange(profile.copy(gpu = profile.gpu.copy(maxFreq = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "最小频率（Hz）",
+            value = profile.gpu.minFreq.toString(),
+            onValueChange = { newValue ->
+                newValue.toLongOrNull()?.let {
+                    onProfileChange(profile.copy(gpu = profile.gpu.copy(minFreq = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "空闲定时器（ms）",
+            value = profile.gpu.idleTimer.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(gpu = profile.gpu.copy(idleTimer = it)))
+                }
+            }
+        )
+        SwitchItem(
+            title = "节流开关",
+            subtitle = "启用GPU节流",
+            checked = profile.gpu.throttlingEnabled,
+            onCheckedChange = {
+                onProfileChange(profile.copy(gpu = profile.gpu.copy(throttlingEnabled = it)))
+            }
+        )
+        SwitchItem(
+            title = "总线分割",
+            subtitle = "启用总线分割",
+            checked = profile.gpu.busSplitEnabled,
+            onCheckedChange = {
+                onProfileChange(profile.copy(gpu = profile.gpu.copy(busSplitEnabled = it)))
+            }
+        )
+        NumberInputField(
+            label = "热功率等级",
+            value = profile.gpu.thermalPwrLevel.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(gpu = profile.gpu.copy(thermalPwrLevel = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "温度触发点（mC）",
+            value = profile.gpu.tripPointTemp.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(gpu = profile.gpu.copy(tripPointTemp = it)))
+                }
+            }
+        )
+        NumberInputField(
+            label = "温度滞后（mC）",
+            value = profile.gpu.tripPointHyst.toString(),
+            onValueChange = { newValue ->
+                newValue.toIntOrNull()?.let {
+                    onProfileChange(profile.copy(gpu = profile.gpu.copy(tripPointHyst = it)))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ProcessManagementCard(
+    pm: ProcessManagement,
+    onUpdate: (ProcessManagement) -> Unit
+) {
+    SettingsSection(title = "进程管理") {
+        SwitchItem(
+            title = "启用进程管理",
+            subtitle = "管理后台进程压制和冻结",
+            checked = pm.enabled,
+            onCheckedChange = { onUpdate(pm.copy(enabled = it)) }
+        )
+        if (pm.enabled) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text("进程压制", style = MaterialTheme.typography.titleSmall)
+            SwitchItem(
+                title = "启用压制",
+                subtitle = "调整OOM评分",
+                checked = pm.suppress.enabled,
+                onCheckedChange = { onUpdate(pm.copy(suppress = pm.suppress.copy(enabled = it))) }
+            )
+            if (pm.suppress.enabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = pm.suppress.mode == SuppressMode.AGGRESSIVE,
+                        onClick = { onUpdate(pm.copy(suppress = pm.suppress.copy(mode = SuppressMode.AGGRESSIVE))) },
+                        label = { Text("激进") }
+                    )
+                    FilterChip(
+                        selected = pm.suppress.mode == SuppressMode.CONSERVATIVE,
+                        onClick = { onUpdate(pm.copy(suppress = pm.suppress.copy(mode = SuppressMode.CONSERVATIVE))) },
+                        label = { Text("保守") }
+                    )
+                }
+                NumberInputField(
+                    label = "OOM值（-1000 到 1000）",
+                    value = pm.suppress.oomScore.toString(),
+                    onValueChange = { newValue ->
+                        newValue.toIntOrNull()?.let {
+                            onUpdate(pm.copy(suppress = pm.suppress.copy(oomScore = it)))
+                        }
+                    }
+                )
+            }
+
+            Text("冻结", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+            SwitchItem(
+                title = "启用冻结",
+                subtitle = "应用退出前台后延迟冻结",
+                checked = pm.freeze.enabled,
+                onCheckedChange = { onUpdate(pm.copy(freeze = pm.freeze.copy(enabled = it))) }
+            )
+            if (pm.freeze.enabled) {
+                NumberInputField(
+                    label = "冻结延迟（秒）",
+                    value = pm.freeze.delaySeconds.toString(),
+                    onValueChange = { newValue ->
+                        newValue.toIntOrNull()?.let {
+                            onUpdate(pm.copy(freeze = pm.freeze.copy(delaySeconds = it)))
+                        }
+                    }
                 )
             }
         }
@@ -466,72 +501,41 @@ fun GpuOptimizationSectionChip(settings: AppSettings, viewModel: MainViewModel) 
 }
 
 @Composable
-fun ProcessSuppressSection(
-    settings: AppSettings,
-    viewModel: MainViewModel,
-    focusManager: FocusManager
+fun BackgroundOptimizationCard(
+    bg: BackgroundOptimization,
+    onUpdate: (BackgroundOptimization) -> Unit
 ) {
-    var scoreText by remember { mutableStateOf(settings.suppressScore.toString()) }
-    val scope = rememberCoroutineScope()
-
-    SettingsSection(title = "进程压制") {
+    SettingsSection(title = "后台优化") {
         SwitchItem(
-            title = "启用进程压制",
-            subtitle = "调整后台进程 OOM 评分",
-            checked = settings.processSuppressEnabled,
-            onCheckedChange = { viewModel.setProcessSuppressEnabled(it) }
+            title = "启用后台优化",
+            subtitle = "限制应用后台行为",
+            checked = bg.enabled,
+            onCheckedChange = { onUpdate(bg.copy(enabled = it)) }
         )
-        if (settings.processSuppressEnabled) {
+        if (bg.enabled) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            NumberInputField(
-                label = "压制评分（-1000 到 1000）",
-                value = scoreText,
-                onValueChange = { newValue ->
-                    scoreText = newValue
-                    newValue.toIntOrNull()?.let {
-                        scope.launch { viewModel.setSuppressScore(it) }
-                    }
-                },
-                focusManager = focusManager
+            SwitchItem(
+                title = "禁止后台运行",
+                subtitle = "通过 appops 限制",
+                checked = bg.restrictBackground,
+                onCheckedChange = { onUpdate(bg.copy(restrictBackground = it)) }
+            )
+            SwitchItem(
+                title = "忽略唤醒锁",
+                subtitle = "应用无法持有唤醒锁",
+                checked = bg.ignoreWakeLock,
+                onCheckedChange = { onUpdate(bg.copy(ignoreWakeLock = it)) }
+            )
+            SwitchItem(
+                title = "设为 Rare 桶",
+                subtitle = "降低应用调度优先级",
+                checked = bg.setStandbyBucketRare,
+                onCheckedChange = { onUpdate(bg.copy(setStandbyBucketRare = it)) }
             )
         }
     }
 }
 
-@Composable
-fun FreezerSection(
-    settings: AppSettings,
-    viewModel: MainViewModel,
-    focusManager: FocusManager
-) {
-    var delayText by remember { mutableStateOf(settings.freezeDelay.toString()) }
-    val scope = rememberCoroutineScope()
-
-    SettingsSection(title = "Freezer 服务") {
-        SwitchItem(
-            title = "启用 Freezer",
-            subtitle = "冻结不活跃的后台进程",
-            checked = settings.freezerEnabled,
-            onCheckedChange = { viewModel.setFreezerEnabled(it) }
-        )
-        if (settings.freezerEnabled) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            NumberInputField(
-                label = "冻结延迟（秒）",
-                value = delayText,
-                onValueChange = { newValue ->
-                    delayText = newValue
-                    newValue.toIntOrNull()?.let {
-                        scope.launch { viewModel.setFreezeDelay(it) }
-                    }
-                },
-                focusManager = focusManager
-            )
-        }
-    }
-}
-
-// ========== 通用组件 ==========
 @Composable
 fun SettingsSection(
     title: String,
@@ -581,6 +585,37 @@ fun SwitchItem(
 }
 
 @Composable
+fun NumberInputField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    focusManager: FocusManager? = null
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager?.clearFocus() }
+            ),
+            singleLine = true
+        )
+    }
+}
+
+@Composable
 fun ClickableItem(
     title: String,
     subtitle: String,
@@ -612,79 +647,4 @@ fun ClickableItem(
             )
         }
     }
-}
-
-@Composable
-fun NumberInputField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    focusManager: FocusManager
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = { focusManager.clearFocus() }
-            ),
-            singleLine = true
-        )
-    }
-}
-
-@Composable
-fun CpuModeChip(
-    mode: String,
-    currentMode: String,
-    onClick: () -> Unit
-) {
-    val isSelected = mode == currentMode
-    val modeName = when (mode) {
-        "daily" -> "日常"
-        "standby" -> "待机"
-        "performance" -> "性能"
-        else -> mode
-    }
-
-    FilterChip(
-        selected = isSelected,
-        onClick = onClick,
-        label = { Text(modeName) },
-        shape = RoundedCornerShape(16.dp)
-    )
-}
-
-@Composable
-fun GpuModeChip(
-    mode: String,
-    currentMode: String,
-    onClick: () -> Unit
-) {
-    val isSelected = mode == currentMode
-    val modeName = when (mode) {
-        "default" -> "默认"
-        "performance" -> "性能"
-        "power_saving" -> "节能"
-        else -> mode
-    }
-
-    FilterChip(
-        selected = isSelected,
-        onClick = onClick,
-        label = { Text(modeName) },
-        shape = RoundedCornerShape(16.dp)
-    )
 }
