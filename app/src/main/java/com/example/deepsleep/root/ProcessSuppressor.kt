@@ -75,8 +75,8 @@ object ProcessSuppressor {
             return@withContext 0
         }
     }
-
-    private fun getPackagePids(packageName: String): List<Int> {
+    
+    private suspend fun getPackagePids(packageName: String): List<Int> {
         val pids = mutableListOf<Int>()
         try {
             val result = RootCommander.exec("pgrep -f $packageName")
