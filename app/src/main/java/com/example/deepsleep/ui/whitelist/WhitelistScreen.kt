@@ -17,9 +17,6 @@ import com.example.deepsleep.model.WhitelistItem
 import com.example.deepsleep.model.WhitelistType
 import kotlinx.coroutines.launch
 
-/**
- * 白名单管理页面
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WhitelistScreen(
@@ -31,7 +28,7 @@ fun WhitelistScreen(
     var editingItem by remember { mutableStateOf<WhitelistItem?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,7 +39,6 @@ fun WhitelistScreen(
                     }
                 },
                 actions = {
-                    // 类型切换
                     var expanded by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(
                         expanded = expanded,
@@ -51,14 +47,14 @@ fun WhitelistScreen(
                         FilterChip(
                             selected = false,
                             onClick = { expanded = true },
-                            label = { 
+                            label = {
                                 Text(
                                     when (uiState.currentType) {
-                                        WhitelistType.SUPPRESS -> "进程压制"
+                                        WhitelistType.PROCESS -> "进程压制"
                                         WhitelistType.BACKGROUND -> "后台优化"
                                         WhitelistType.NETWORK -> "网络白名单"
                                     }
-                                ) 
+                                )
                             },
                             trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                             modifier = Modifier.menuAnchor()
@@ -70,7 +66,7 @@ fun WhitelistScreen(
                             DropdownMenuItem(
                                 text = { Text("进程压制") },
                                 onClick = {
-                                    viewModel.switchType(WhitelistType.SUPPRESS)
+                                    viewModel.switchType(WhitelistType.PROCESS)
                                     expanded = false
                                 }
                             )
@@ -104,7 +100,7 @@ fun WhitelistScreen(
                 .padding(padding)
         ) {
             InfoBanner(type = uiState.currentType)
-            
+
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -135,12 +131,12 @@ fun WhitelistScreen(
             }
         }
     }
-    
+
     if (showAddDialog || editingItem != null) {
         AddEditDialog(
             item = editingItem,
             type = uiState.currentType,
-            onDismiss = { 
+            onDismiss = {
                 showAddDialog = false
                 editingItem = null
             },
@@ -164,7 +160,7 @@ fun WhitelistScreen(
 @Composable
 fun InfoBanner(type: WhitelistType) {
     val (icon, title, desc) = when (type) {
-        WhitelistType.SUPPRESS -> Triple(
+        WhitelistType.PROCESS -> Triple(
             Icons.Default.Security,
             "进程压制白名单",
             "这些进程不会被调整 OOM 分数"
@@ -180,7 +176,7 @@ fun InfoBanner(type: WhitelistType) {
             "这些应用在深度睡眠模式下仍可访问网络"
         )
     }
-    
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.secondaryContainer
@@ -271,7 +267,7 @@ fun WhitelistItemCard(
                     )
                 }
             }
-            
+
             Row {
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "编辑")
@@ -293,7 +289,7 @@ fun AddEditDialog(
 ) {
     var name by remember { mutableStateOf(item?.name ?: "") }
     var note by remember { mutableStateOf(item?.note ?: "") }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (item == null) "添加白名单" else "编辑白名单") },
@@ -309,7 +305,7 @@ fun AddEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
