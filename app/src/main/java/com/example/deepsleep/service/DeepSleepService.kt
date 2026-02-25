@@ -16,6 +16,7 @@ import com.example.deepsleep.data.*
 import com.example.deepsleep.model.PerformanceMode
 import com.example.deepsleep.root.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 class DeepSleepService : Service() {
     private val TAG = "DeepSleepService"
@@ -131,7 +132,7 @@ class DeepSleepService : Service() {
         unregisterReceiver(screenStateReceiver)
         serviceScope.cancel()
         ProcessManager.onDestroy()
-        runBlocking { DeepSleepController.exitDeepSleep() }   // 修复点
+        runBlocking { DeepSleepController.exitDeepSleep() }
         super.onDestroy()
     }
 
