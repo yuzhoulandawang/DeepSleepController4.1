@@ -15,7 +15,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.deepsleep.data.SettingsRepository
 import com.example.deepsleep.data.StatsRepository
 import com.example.deepsleep.service.DeepSleepService
 import com.example.deepsleep.ui.logs.LogsScreen
@@ -35,7 +34,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        SettingsRepository.initialize(this)
+        // SettingsRepository 已在 Application 中初始化
 
         lifecycleScope.launch {
             StatsRepository.ensureLoaded()
