@@ -1,12 +1,13 @@
 package com.example.deepsleep
 
-import com.example.deepsleep.BuildConfig
 import android.app.Application
+import com.example.deepsleep.data.SettingsRepository
 import com.topjohnwu.superuser.Shell
 
 class DeepSleepApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        SettingsRepository.initialize(this)
         Shell.enableVerboseLogging = BuildConfig.DEBUG
         Shell.setDefaultBuilder(
             Shell.Builder.create()
