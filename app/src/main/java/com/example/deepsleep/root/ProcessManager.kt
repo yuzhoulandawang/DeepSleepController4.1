@@ -3,6 +3,7 @@ package com.example.deepsleep.root
 import android.util.Log
 import com.example.deepsleep.data.SettingsRepository
 import com.example.deepsleep.model.SuppressMode
+import com.example.deepsleep.service.FreezerService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 
