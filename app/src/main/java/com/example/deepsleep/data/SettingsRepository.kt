@@ -13,14 +13,14 @@ import java.io.IOException
 object SettingsRepository {
     private lateinit var dataStore: DataStore<Preferences>
 
-    // 深度睡眠
+    // ========== 深度睡眠 ==========
     private val DEEP_SLEEP_ENABLED = booleanPreferencesKey("deep_sleep_enabled")
     private val DEEP_SLEEP_DELAY_SECONDS = intPreferencesKey("deep_sleep_delay_seconds")
     private val DEEP_SLEEP_CHECK_INTERVAL = intPreferencesKey("deep_sleep_check_interval")
     private val ENABLE_POWER_SAVER_ON_SLEEP = booleanPreferencesKey("enable_power_saver_on_sleep")
     private val DISABLE_POWER_SAVER_ON_WAKE = booleanPreferencesKey("disable_power_saver_on_wake")
 
-    // 性能优化
+    // ========== 性能优化 ==========
     private val PERF_ENABLED = booleanPreferencesKey("perf_enabled")
     private val PERF_SELECTED_MODE = stringPreferencesKey("perf_selected_mode")
 
@@ -72,7 +72,7 @@ object SettingsRepository {
     private val PERF_GPU_TRIP_TEMP = intPreferencesKey("perf_gpu_trip_temp")
     private val PERF_GPU_TRIP_HYST = intPreferencesKey("perf_gpu_trip_hyst")
 
-    // 进程管理
+    // ========== 进程管理 ==========
     private val PROC_ENABLED = booleanPreferencesKey("proc_enabled")
     private val SUPPRESS_ENABLED = booleanPreferencesKey("suppress_enabled")
     private val SUPPRESS_MODE = stringPreferencesKey("suppress_mode")
@@ -80,13 +80,13 @@ object SettingsRepository {
     private val FREEZE_ENABLED = booleanPreferencesKey("freeze_enabled")
     private val FREEZE_DELAY = intPreferencesKey("freeze_delay")
 
-    // 后台优化
+    // ========== 后台优化 ==========
     private val BG_ENABLED = booleanPreferencesKey("bg_enabled")
     private val BG_RESTRICT = booleanPreferencesKey("bg_restrict")
     private val BG_IGNORE_WAKE = booleanPreferencesKey("bg_ignore_wake")
     private val BG_STANDBY_RARE = booleanPreferencesKey("bg_standby_rare")
 
-    // 场景检测
+    // ========== 场景检测 ==========
     private val SCENE_ENABLED = booleanPreferencesKey("scene_enabled")
     private val SCENE_NETWORK = booleanPreferencesKey("scene_network")
     private val SCENE_AUDIO = booleanPreferencesKey("scene_audio")
@@ -98,10 +98,10 @@ object SettingsRepository {
     private val SCENE_CAST = booleanPreferencesKey("scene_cast")
     private val SCENE_CHARGING = booleanPreferencesKey("scene_charging")
 
-    // 白名单（简单用逗号分隔）
+    // ========== 白名单 ==========
     private val WHITELIST = stringPreferencesKey("whitelist")
 
-    // 系统状态
+    // ========== 系统状态 ==========
     private val ROOT_GRANTED = stringPreferencesKey("root_granted")
     private val SERVICE_RUNNING = booleanPreferencesKey("service_running")
 
@@ -111,119 +111,122 @@ object SettingsRepository {
         dataStore = context.dataStore
     }
 
-    val settings: Flow<AppSettings> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
+    // 修改为 getter，确保每次访问时 dataStore 已初始化
+    val settings: Flow<AppSettings>
+        get() = dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
             }
-        }
-        .map { preferences ->
-            AppSettings(
-                deepSleep = DeepSleep(
-                    enabled = preferences[DEEP_SLEEP_ENABLED] ?: false,
-                    delaySeconds = preferences[DEEP_SLEEP_DELAY_SECONDS] ?: 60,
-                    checkIntervalSeconds = preferences[DEEP_SLEEP_CHECK_INTERVAL] ?: 30,
-                    enablePowerSaverOnSleep = preferences[ENABLE_POWER_SAVER_ON_SLEEP] ?: false,
-                    disablePowerSaverOnWake = preferences[DISABLE_POWER_SAVER_ON_WAKE] ?: false
-                ),
-                performanceOptimization = PerformanceOptimization(
-                    enabled = preferences[PERF_ENABLED] ?: false,
-                    selectedMode = PerformanceMode.valueOf(preferences[PERF_SELECTED_MODE] ?: "DAILY"),
-                    ecoProfile = PerformanceProfile(
-                        cpu = CpuParams(
-                            upRate = preferences[ECO_CPU_UP_RATE] ?: 5000,
-                            downRate = preferences[ECO_CPU_DOWN_RATE] ?: 0,
-                            hispeedLoad = preferences[ECO_CPU_HISPEED_LOAD] ?: 95,
-                            targetLoads = preferences[ECO_CPU_TARGET_LOADS] ?: 90
+            .map { preferences ->
+                AppSettings(
+                    deepSleep = DeepSleep(
+                        enabled = preferences[DEEP_SLEEP_ENABLED] ?: false,
+                        delaySeconds = preferences[DEEP_SLEEP_DELAY_SECONDS] ?: 60,
+                        checkIntervalSeconds = preferences[DEEP_SLEEP_CHECK_INTERVAL] ?: 30,
+                        enablePowerSaverOnSleep = preferences[ENABLE_POWER_SAVER_ON_SLEEP] ?: false,
+                        disablePowerSaverOnWake = preferences[DISABLE_POWER_SAVER_ON_WAKE] ?: false
+                    ),
+                    performanceOptimization = PerformanceOptimization(
+                        enabled = preferences[PERF_ENABLED] ?: false,
+                        selectedMode = PerformanceMode.valueOf(preferences[PERF_SELECTED_MODE] ?: "DAILY"),
+                        ecoProfile = PerformanceProfile(
+                            cpu = CpuParams(
+                                upRate = preferences[ECO_CPU_UP_RATE] ?: 5000,
+                                downRate = preferences[ECO_CPU_DOWN_RATE] ?: 0,
+                                hispeedLoad = preferences[ECO_CPU_HISPEED_LOAD] ?: 95,
+                                targetLoads = preferences[ECO_CPU_TARGET_LOADS] ?: 90
+                            ),
+                            gpu = GpuParams(
+                                maxFreq = preferences[ECO_GPU_MAX_FREQ] ?: 500_000_000,
+                                minFreq = preferences[ECO_GPU_MIN_FREQ] ?: 231_000_000,
+                                idleTimer = preferences[ECO_GPU_IDLE_TIMER] ?: 100,
+                                throttlingEnabled = preferences[ECO_GPU_THROTTLING] ?: true,
+                                busSplitEnabled = preferences[ECO_GPU_BUS_SPLIT] ?: true,
+                                thermalPwrLevel = preferences[ECO_GPU_THERMAL_PWR] ?: 8,
+                                tripPointTemp = preferences[ECO_GPU_TRIP_TEMP] ?: 45000,
+                                tripPointHyst = preferences[ECO_GPU_TRIP_HYST] ?: 3000
+                            )
                         ),
-                        gpu = GpuParams(
-                            maxFreq = preferences[ECO_GPU_MAX_FREQ] ?: 500_000_000,
-                            minFreq = preferences[ECO_GPU_MIN_FREQ] ?: 231_000_000,
-                            idleTimer = preferences[ECO_GPU_IDLE_TIMER] ?: 100,
-                            throttlingEnabled = preferences[ECO_GPU_THROTTLING] ?: true,
-                            busSplitEnabled = preferences[ECO_GPU_BUS_SPLIT] ?: true,
-                            thermalPwrLevel = preferences[ECO_GPU_THERMAL_PWR] ?: 8,
-                            tripPointTemp = preferences[ECO_GPU_TRIP_TEMP] ?: 45000,
-                            tripPointHyst = preferences[ECO_GPU_TRIP_HYST] ?: 3000
+                        dailyProfile = PerformanceProfile(
+                            cpu = CpuParams(
+                                upRate = preferences[DAILY_CPU_UP_RATE] ?: 1000,
+                                downRate = preferences[DAILY_CPU_DOWN_RATE] ?: 500,
+                                hispeedLoad = preferences[DAILY_CPU_HISPEED_LOAD] ?: 85,
+                                targetLoads = preferences[DAILY_CPU_TARGET_LOADS] ?: 80
+                            ),
+                            gpu = GpuParams(
+                                maxFreq = preferences[DAILY_GPU_MAX_FREQ] ?: 770_000_000,
+                                minFreq = preferences[DAILY_GPU_MIN_FREQ] ?: 310_000_000,
+                                idleTimer = preferences[DAILY_GPU_IDLE_TIMER] ?: 50,
+                                throttlingEnabled = preferences[DAILY_GPU_THROTTLING] ?: true,
+                                busSplitEnabled = preferences[DAILY_GPU_BUS_SPLIT] ?: true,
+                                thermalPwrLevel = preferences[DAILY_GPU_THERMAL_PWR] ?: 5,
+                                tripPointTemp = preferences[DAILY_GPU_TRIP_TEMP] ?: 55000,
+                                tripPointHyst = preferences[DAILY_GPU_TRIP_HYST] ?: 5000
+                            )
+                        ),
+                        performanceProfile = PerformanceProfile(
+                            cpu = CpuParams(
+                                upRate = preferences[PERF_CPU_UP_RATE] ?: 0,
+                                downRate = preferences[PERF_CPU_DOWN_RATE] ?: 0,
+                                hispeedLoad = preferences[PERF_CPU_HISPEED_LOAD] ?: 75,
+                                targetLoads = preferences[PERF_CPU_TARGET_LOADS] ?: 70
+                            ),
+                            gpu = GpuParams(
+                                maxFreq = preferences[PERF_GPU_MAX_FREQ] ?: 903_000_000,
+                                minFreq = preferences[PERF_GPU_MIN_FREQ] ?: 578_000_000,
+                                idleTimer = preferences[PERF_GPU_IDLE_TIMER] ?: 10,
+                                throttlingEnabled = preferences[PERF_GPU_THROTTLING] ?: false,
+                                busSplitEnabled = preferences[PERF_GPU_BUS_SPLIT] ?: false,
+                                thermalPwrLevel = preferences[PERF_GPU_THERMAL_PWR] ?: 0,
+                                tripPointTemp = preferences[PERF_GPU_TRIP_TEMP] ?: 65000,
+                                tripPointHyst = preferences[PERF_GPU_TRIP_HYST] ?: 7000
+                            )
                         )
                     ),
-                    dailyProfile = PerformanceProfile(
-                        cpu = CpuParams(
-                            upRate = preferences[DAILY_CPU_UP_RATE] ?: 1000,
-                            downRate = preferences[DAILY_CPU_DOWN_RATE] ?: 500,
-                            hispeedLoad = preferences[DAILY_CPU_HISPEED_LOAD] ?: 85,
-                            targetLoads = preferences[DAILY_CPU_TARGET_LOADS] ?: 80
+                    processManagement = ProcessManagement(
+                        enabled = preferences[PROC_ENABLED] ?: false,
+                        suppress = ProcessSuppress(
+                            enabled = preferences[SUPPRESS_ENABLED] ?: false,
+                            mode = SuppressMode.valueOf(preferences[SUPPRESS_MODE] ?: "CONSERVATIVE"),
+                            oomScore = preferences[SUPPRESS_OOM] ?: 800
                         ),
-                        gpu = GpuParams(
-                            maxFreq = preferences[DAILY_GPU_MAX_FREQ] ?: 770_000_000,
-                            minFreq = preferences[DAILY_GPU_MIN_FREQ] ?: 310_000_000,
-                            idleTimer = preferences[DAILY_GPU_IDLE_TIMER] ?: 50,
-                            throttlingEnabled = preferences[DAILY_GPU_THROTTLING] ?: true,
-                            busSplitEnabled = preferences[DAILY_GPU_BUS_SPLIT] ?: true,
-                            thermalPwrLevel = preferences[DAILY_GPU_THERMAL_PWR] ?: 5,
-                            tripPointTemp = preferences[DAILY_GPU_TRIP_TEMP] ?: 55000,
-                            tripPointHyst = preferences[DAILY_GPU_TRIP_HYST] ?: 5000
+                        freeze = ProcessFreeze(
+                            enabled = preferences[FREEZE_ENABLED] ?: false,
+                            delaySeconds = preferences[FREEZE_DELAY] ?: 30
                         )
                     ),
-                    performanceProfile = PerformanceProfile(
-                        cpu = CpuParams(
-                            upRate = preferences[PERF_CPU_UP_RATE] ?: 0,
-                            downRate = preferences[PERF_CPU_DOWN_RATE] ?: 0,
-                            hispeedLoad = preferences[PERF_CPU_HISPEED_LOAD] ?: 75,
-                            targetLoads = preferences[PERF_CPU_TARGET_LOADS] ?: 70
-                        ),
-                        gpu = GpuParams(
-                            maxFreq = preferences[PERF_GPU_MAX_FREQ] ?: 903_000_000,
-                            minFreq = preferences[PERF_GPU_MIN_FREQ] ?: 578_000_000,
-                            idleTimer = preferences[PERF_GPU_IDLE_TIMER] ?: 10,
-                            throttlingEnabled = preferences[PERF_GPU_THROTTLING] ?: false,
-                            busSplitEnabled = preferences[PERF_GPU_BUS_SPLIT] ?: false,
-                            thermalPwrLevel = preferences[PERF_GPU_THERMAL_PWR] ?: 0,
-                            tripPointTemp = preferences[PERF_GPU_TRIP_TEMP] ?: 65000,
-                            tripPointHyst = preferences[PERF_GPU_TRIP_HYST] ?: 7000
-                        )
-                    )
-                ),
-                processManagement = ProcessManagement(
-                    enabled = preferences[PROC_ENABLED] ?: false,
-                    suppress = ProcessSuppress(
-                        enabled = preferences[SUPPRESS_ENABLED] ?: false,
-                        mode = SuppressMode.valueOf(preferences[SUPPRESS_MODE] ?: "CONSERVATIVE"),
-                        oomScore = preferences[SUPPRESS_OOM] ?: 800
+                    backgroundOptimization = BackgroundOptimization(
+                        enabled = preferences[BG_ENABLED] ?: false,
+                        restrictBackground = preferences[BG_RESTRICT] ?: false,
+                        ignoreWakeLock = preferences[BG_IGNORE_WAKE] ?: false,
+                        setStandbyBucketRare = preferences[BG_STANDBY_RARE] ?: false
                     ),
-                    freeze = ProcessFreeze(
-                        enabled = preferences[FREEZE_ENABLED] ?: false,
-                        delaySeconds = preferences[FREEZE_DELAY] ?: 30
-                    )
-                ),
-                backgroundOptimization = BackgroundOptimization(
-                    enabled = preferences[BG_ENABLED] ?: false,
-                    restrictBackground = preferences[BG_RESTRICT] ?: false,
-                    ignoreWakeLock = preferences[BG_IGNORE_WAKE] ?: false,
-                    setStandbyBucketRare = preferences[BG_STANDBY_RARE] ?: false
-                ),
-                sceneCheck = SceneCheck(
-                    enabled = preferences[SCENE_ENABLED] ?: false,
-                    checkNetworkTraffic = preferences[SCENE_NETWORK] ?: true,
-                    checkAudioPlayback = preferences[SCENE_AUDIO] ?: true,
-                    checkNavigation = preferences[SCENE_NAV] ?: true,
-                    checkPhoneCall = preferences[SCENE_CALL] ?: true,
-                    checkNfcP2p = preferences[SCENE_NFC] ?: true,
-                    checkWifiHotspot = preferences[SCENE_HOTSPOT] ?: true,
-                    checkUsbTethering = preferences[SCENE_USB] ?: true,
-                    checkScreenCasting = preferences[SCENE_CAST] ?: true,
-                    checkCharging = preferences[SCENE_CHARGING] ?: false
-                ),
-                whitelist = preferences[WHITELIST]?.split(",")?.filter { it.isNotBlank() }?.map { pkg ->
-                    WhitelistItem(id = pkg, name = pkg, note = "", type = WhitelistType.PROCESS) // 简化
-                } ?: emptyList(),
-                rootGranted = preferences[ROOT_GRANTED]?.toBoolean() ?: false,
-                serviceRunning = preferences[SERVICE_RUNNING] ?: false
-            )
-        }
+                    sceneCheck = SceneCheck(
+                        enabled = preferences[SCENE_ENABLED] ?: false,
+                        checkNetworkTraffic = preferences[SCENE_NETWORK] ?: true,
+                        checkAudioPlayback = preferences[SCENE_AUDIO] ?: true,
+                        checkNavigation = preferences[SCENE_NAV] ?: true,
+                        checkPhoneCall = preferences[SCENE_CALL] ?: true,
+                        checkNfcP2p = preferences[SCENE_NFC] ?: true,
+                        checkWifiHotspot = preferences[SCENE_HOTSPOT] ?: true,
+                        checkUsbTethering = preferences[SCENE_USB] ?: true,
+                        checkScreenCasting = preferences[SCENE_CAST] ?: true,
+                        checkCharging = preferences[SCENE_CHARGING] ?: false
+                    ),
+                    whitelist = preferences[WHITELIST]?.split(",")?.filter { it.isNotBlank() }?.map { pkg ->
+                        WhitelistItem(id = pkg, name = pkg, note = "", type = WhitelistType.PROCESS)
+                    } ?: emptyList(),
+                    rootGranted = preferences[ROOT_GRANTED]?.toBoolean() ?: false,
+                    serviceRunning = preferences[SERVICE_RUNNING] ?: false
+                )
+            }
 
+    // ========== Setter 方法 ==========
     suspend fun updateDeepSleep(deepSleep: DeepSleep) {
         dataStore.edit { prefs ->
             prefs[DEEP_SLEEP_ENABLED] = deepSleep.enabled
